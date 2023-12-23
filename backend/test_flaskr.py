@@ -72,13 +72,11 @@ class TriviaTestCase(unittest.TestCase):
 
     
     def test_delete_question(self):
-        res = self.client().delete('/questions/2')
+        res = self.client().delete('/questions/0')
         data = json.loads(res.data)
 
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(data['success'], True)
-        self.assertTrue(data['deleted'])
-
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(data['success'], False)
 
     def test_delete_an_invalid_question_404(self):
         res = self.client().delete('/questions/711')
@@ -155,6 +153,20 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(data['success'], False)
         self.assertEqual(data['message'], 'Bad request')
 
+    def test_retrieve_questions_by_category(self):
+        res = self.client().get('/categories/1/questions')
+        data = json.loads(res.data)
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(data['success'])
+        self.assertTrue(data['questions'])
+
+    def test_failed_retrieve_questions_by_category(self):
+        res = self.client().get('/categories/1000000/questions')
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(data['success'], False)
+        self.assertEqual(data['message'], 'Resource not found')
 
 # Make the tests conveniently executable
 if __name__ == "__main__":

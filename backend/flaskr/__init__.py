@@ -166,29 +166,22 @@ def create_app(test_config=None):
     Try using the word "title" to start.
     """
     @app.route('/questions/search', methods=['POST'])
-    def search_question():
+    def search_questions():
         body = request.get_json()
-
-        if body is None:
+        if not body:
             abort(400)
 
-        search_term = body.get('searchTerm', None)
+        search_term = body.get('searchTerm',None)
 
-        try:
-            selection = Question.query\
-                .filter(Question.question.ilike(f"%{search_term}%"))\
-                .order_by(Question.id)\
-                .all()
-            current_questions = numbered_questions(request, selection)
-
-            return jsonify({
-                'total_questions': len(selection),
-                'current_category': None,
-                'success': True,
-                'questions': current_questions       
-            })
-        except:
-            abort(422)
+        questions = Question.query.filter(
+            Question.question.ilike(f'%{search_term}%')).all()
+        current_questions = [question.format() for question in questions]
+        return jsonify({
+            'success': True,
+            'questions': current_questions, 
+            'total_questions': len(questions),
+            'current_category': None,
+        })
 
     """
     @TODO:
@@ -198,22 +191,23 @@ def create_app(test_config=None):
     categories in the left column will cause only questions of that
     category to be shown.
     """
-    @app.route('/categories/<int:category_id>/questions')
+    @app.route('/categories/<int:category_id>/questions',methods=['GET'])
     def retrieve_questions_by_category(category_id):
-        try:
-            category_id = str(category_id)
-            selection = Question.query.filter(
-                Question.category == category_id).all()
-            current_questions = numbered_questions(request, selection)
+        current_category = Category.query.get(category_id)
+        if current_category is None:
+            abort(404)
 
-            return jsonify({
-                'success': True,
-                'total_questions': len(selection),
-                'current_category': category_id,
-                'questions': current_questions      
-            })
-        except:
-            abort(422)
+        current_questions = Question.query.filter(Question.category == category_id).all()
+        if not current_questions:
+            return abort(404)
+        result_questions = [question.format() for question in current_questions]
+        return jsonify({
+            'success': True,
+            'questions': result_questions,
+            'total_questions': len(result_questions),
+            'current_category': current_category.format(),
+            'categories': [category.format() for category in Category.query.all()]
+    })
 
     """
     @TODO:
@@ -229,32 +223,31 @@ def create_app(test_config=None):
     @app.route('/quizzes', methods=['POST'])
     def play_quizzes():
         body = request.get_json()
-
         if not body:
             abort(400)
-
-        previous_questions = body.get('previous_questions', None)
-        quiz_category = body.get('quiz_category', None)
-
-        try:
-            if quiz_category['id'] == 0:
-                questions = Question.query.filter(
-                    Question.id.notin_(previous_questions)).all()
-            else:
-                questions = Question.query\
-                    .filter(Question.category == quiz_category['id'])\
-                    .filter(Question.id.notin_(previous_questions))\
-                    .all()
-
-            if questions:
-                next_question = random.choice(questions)
-
+        previous_question = body.get('previous_questions')
+        quiz_categories = body.get('quiz_category')
+        if not quiz_categories:
+            abort(400)
+        category_id = quiz_categories.get('id')
+        if category_id == 0:
+            questions = Question.query.all()
+        else:
+            questions = Question.query.filter(
+                Question.category == category_id).all()
+        current_questions = [question.format() for question in questions]
+        if previous_question:
+            current_questions = [question for question in current_questions if question.get(
+                'id') not in previous_question]
+        if len(current_questions) == 0:
             return jsonify({
-                'success': True,
-                'question': next_question.format()
+                'success': False
             })
-        except:
-            abort(422)
+        question = random.choice(current_questions)
+        return jsonify({
+            'success': True,
+            'question': question
+    })
 
     """
     @TODO:
